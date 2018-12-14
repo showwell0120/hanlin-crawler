@@ -3,6 +3,7 @@ const fs = require('fs');
 
 /***結果目錄***/
 const targetDir = 'data';
+const baseDir = 'data/base';
 const rootUrl = 'http://tr322.shop2000.com.tw/product/157825';
 
 let browser;
@@ -176,22 +177,28 @@ scrapePager(rootUrl).then((res) => {
             });
         }
 
-        if (!fs.existsSync(targetDir))
-            fs.mkdirSync(targetDir);
+        const _createPdDir = (parentDir, pdName, pdList) => {
+            fs.mkdirSync(parentDir);
+            let pdPath = `${parentDir}/${pdName}`;
+            pdList[page][i]['pdPath'] = pdPath;
+            if (!fs.existsSync(pdPath))
+                fs.mkdirSync(pdPath);
+        }
 
         for (const page in pdList) {
-            let path = `${targetDir}/${page}`
-            if (!fs.existsSync(path)){
-                fs.mkdirSync(path);
-                for (let i = 0; i < pdList[page].length; i++) {
-                    const pd = pdList[page][i];
-                    let pdName = `${pd.t} ${pd.p}`;
-                    pdName = pdName.replace(/\//gi, '&');
-                    pdName = pdName.replace(/\?/gi, '');
-                    let pdPath = `${path}/${pdName}`;
-                    pdList[page][i]['pdPath'] = pdPath;
-                    if (!fs.existsSync(pdPath))
-                        fs.mkdirSync(pdPath);
+            for (let i = 0; i < pdList[page].length; i++) {
+                const pd = pdList[page][i];
+                let pdName = `${pd.t} ${pd.p}`;
+                pdName = pdName.replace(/\//gi, '&');
+                pdName = pdName.replace(/\?/gi, '');
+                if(!fs.existsSync(targetDir)) {
+                    //第一次抓資料
+                    _createPdDir(baseDir, pdName, pdList)
+                } else {
+                    //後來再抓資料
+                    let date = new Date().toISOString().slice(0,10);
+                    let newDirPath = `${targetDir}/${date}`;
+                    _createPdDir(newDirPath, pdName, pdList)
                 }
             }
         }
