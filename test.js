@@ -9,6 +9,7 @@ var scrapeContent = async (u) => {
         browser= await puppeteer.launch({headless: false});
     const page = await browser.newPage();
     await page.goto(u);
+    await page.waitForNavigation();
 
     const result = await page.evaluate(() => {
         let resultObj = {
@@ -52,18 +53,6 @@ var downloadImg = function(uri, index, callback){
 };
 var writeText = function(text) {
     let textPath = 'data/text' + '.txt';
-    let prefixPath = 'template/text-prefix.txt';
-    // let allText = '';
-    // fs.readFile(prefixPath, function (err, data) {
-    //     if(data && data.toString().length > 0){
-    //         allText = data.toString() + '\r\n\r\n' + text;
-    //         fs.writeFile(textPath, allText, function(err) {
-    //             if(err)
-    //                 return console.log(err);
-    //             console.log("The file was saved!");
-    //         }); 
-    //     }
-    // });
     fs.writeFile(textPath, text, function(err) {
         if(err)
             return console.log(err);

@@ -1,12 +1,12 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
+const request = require('request');
 
-/***結果目錄***/
-const targetDir = 'data';
+const dataDir = 'data';
 const rootUrl = 'http://tr322.shop2000.com.tw/product/157825';
+let pdPrefixPath = '';
 
 let browser;
-let contentPage;
 
 /***取每分頁的商品摘要***/
 let urlArr = [];
@@ -127,6 +127,12 @@ let scrapeContent = async (u) => {
         return resultObj;
     });
 
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    await delay(5000);
+
     await page.close();
 
     return result;
@@ -137,12 +143,13 @@ let downloadImg = function(uri, index, path, callback){
         request(uri).pipe(fs.createWriteStream(imgPath)).on('close', callback);
     });
 }
-var writeText = function(text, path) {
+let writeText = function(text, path, callback) {
     let textPath = path + '/text.txt';
     fs.writeFile(textPath, text, function(err) {
         if(err)
             return console.log(err);
-        console.log("The file was saved!");
+        console.log(textPath, " was saved!");
+        if(callback) callback();
     }); 
 }
 let startScrapeDetail = () => {
@@ -152,19 +159,36 @@ let startScrapeDetail = () => {
                 const _u = pdList[page][i]['u'];
                 const _path = pdList[page][i]['pdPath'];
                 await new Promise(resolve => {
-                    scrapeContent(_u).then((r) => { 
+                    scrapeContent(_u).then((r) => {
                         if(r.imgArr.length > 0)
-                            r.imgArr.forEach((item, i) => downloadImg(item, i, function() {}));
-                        if(typeof r.text == 'string' && r.text.length > 0)
-                            writeText(r.text, _path);
+                        {
+                            let imgCount = 0;
+                            r.imgArr.forEach((item, i) => downloadImg(item, i, _path, function() {
+                                imgCount++;
+                                let imgPath = _path + '/img_' + i + '.jpg';
+                                console.log(imgPath, " was saved!");
+                                if(imgCount == r.imgArr.length) {
+                                    if(typeof r.text == 'string' && r.text.length > 0)
+                                        writeText(r.text, _path, function() {
+                                            resolve();
+                                        });
+                                }
+                            }));
+                        }
+                            
                     })
                 });
             }
         }
     })();
 }
+let createDir = (path) => {
+    if(!fs.existsSync(path))
+        fs.mkdirSync(path);
+}
 //start & 建立各商品的資料夾
-scrapePager(rootUrl).then((res) => { 
+createDir(dataDir);
+scrapePager(rootUrl).then((res) => {
     urlArr = res;
     (async function loop() {
         for (let i = 0; i < urlArr.length - 1; i++) {
@@ -176,22 +200,29 @@ scrapePager(rootUrl).then((res) => {
             });
         }
 
-        let curDir = '';
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir);
-            curDir = `${targetDir}/base`;
+        const baseDir = `${dataDir}/base`;
+        let dateDir = '';
+        let isFirst = false;
+        if(!fs.existsSync(baseDir)){
+            fs.mkdirSync(baseDir);
+            isFirst = true;
         } else {
             let date = new Date().toISOString().slice(0,10);
-            curDir = `${targetDir}/${date}`;
+            dateDir = `${dataDir}/${date}`;
+            createDir(dateDir);
         }
             
         const _createPdDir = (pdName, pd) => {
-            if(!fs.existsSync(curDir))
-                fs.mkdirSync(curDir);
-            let pdPath = `${curDir}/${pdName}`;
+            let pdPath = `${baseDir}/${pdName}`;
+            if(isFirst) {
+                createDir(pdPath);
+            } else {
+                if (!fs.existsSync(pdPath)) {
+                    pdPath = `${dateDir}/${{pdName}}`;
+                    createDir(pdPath);
+                }
+            }
             pd['pdPath'] = pdPath;
-            if (!fs.existsSync(pdPath))
-                fs.mkdirSync(pdPath);
         }
 
         for (const page in pdList) {
@@ -203,7 +234,7 @@ scrapePager(rootUrl).then((res) => {
                 _createPdDir(pdName, pd);
             }
         }
-        // startScrapeDetail();
+        startScrapeDetail();
     })();
 });
 
