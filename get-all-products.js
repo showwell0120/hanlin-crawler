@@ -122,17 +122,18 @@ let scrapeContent = async (u) => {
     });
 
     const nextLi = await page.$("li.w");
-    const nextLiText = await page.evaluate(element => element.textContent, nextLi);
-    if(nextLiText && nextLiText == '下一頁') {
-        await page.$$eval('li.w', elements => elements[0].click());
-        await waitForMoment(5000);
-        const nextImgs = await page.evaluate(() => {
-            const imgs = document.querySelectorAll('img.img_large');
-            let srcs = imgs && imgs.length > 0 ? [].map.call(imgs, a => a.src) : [];
-            return srcs;
-        });
-
-        result.imgArr = result.imgArr.concat(nextImgs);
+    if(nextLi) {
+        const nextLiText = await page.evaluate(element => element.textContent, nextLi);
+        if(nextLiText && nextLiText == '下一頁') {
+            await page.$$eval('li.w', elements => elements[0].click());
+            await waitForMoment(5000);
+            const nextImgs = await page.evaluate(() => {
+                const imgs = document.querySelectorAll('img.img_large');
+                let srcs = imgs && imgs.length > 0 ? [].map.call(imgs, a => a.src) : [];
+                return srcs;
+            });
+            result.imgArr = result.imgArr.concat(nextImgs);
+        }
     }
 
     await waitForMoment(5000);
@@ -144,7 +145,13 @@ let scrapeContent = async (u) => {
 let downloadImg = function(uri, index, path, callback){
     let imgPath = path + '/img_' + index + '.jpg';
     request.head(uri, function(err, res, body){
-        request(uri).pipe(fs.createWriteStream(imgPath)).on('close', callback);
+        request({
+            url: uri,
+            timeout: 120000
+        }).pipe(fs.createWriteStream(imgPath)).on('close', callback).on('error', function(e) {
+            console.error("downloadImg error: ", e);
+            callback();
+        });
     });
 }
 let writeText = function(text, path, callback) {
@@ -152,28 +159,35 @@ let writeText = function(text, path, callback) {
     fs.writeFile(textPath, text, function(err) {
         if(err)
             return console.log(err);
-        console.log(textPath, " was saved!");
+        // console.log(textPath, " was saved!");
         if(callback) callback();
     }); 
 }
 let startScrapeDetail = () => {
+    let pdCount = 0;
     (async function loop() {
         for (const page in pdList) {
+            // for (let i = pdList[page].length - 1; i >= 0; i--) {
             for (let i = 0; i < pdList[page].length; i++) {
                 const _u = pdList[page][i]['u'];
                 const _path = pdList[page][i]['pdPath'];
                 await new Promise(resolve => {
                     scrapeContent(_u).then((r) => {
+                        // console.log(r);
                         if(r.imgArr.length > 0)
                         {
                             let imgCount = 0;
                             r.imgArr.forEach((item, i) => downloadImg(item, i, _path, function() {
                                 imgCount++;
                                 let imgPath = _path + '/img_' + i + '.jpg';
-                                console.log(imgPath, " was saved!");
+                                // console.log(imgPath, " was saved!");
                                 if(imgCount == r.imgArr.length) {
                                     if(typeof r.text == 'string' && r.text.length > 0)
-                                        writeText(r.text, _path, function() {resolve();});
+                                        writeText(r.text, _path, function() {
+                                            resolve();
+                                            pdCount++;
+                                            console.log(pdCount + '/157 finished');
+                                        });
                                 }
                             }));
                         }
