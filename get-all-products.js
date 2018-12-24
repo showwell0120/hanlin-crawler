@@ -4,7 +4,6 @@ const request = require('request');
 
 const dataDir = 'data';
 const rootUrl = 'http://tr322.shop2000.com.tw/product/157825';
-let pdPrefixPath = '';
 
 let browser;
 
@@ -99,39 +98,44 @@ let scrapeContent = async (u) => {
     const page = await browser.newPage();
     await page.goto(u);
 
+    function waitForMoment(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     const result = await page.evaluate(() => {
         let resultObj = {
             imgArr: [],
             text: null
         }
 
-        const pushImgLink = function() {
-            let allImg = document.querySelectorAll('img.img_large');
-            if(allImg && allImg.length > 0 ){
-                for (i = 0; i < allImg.length; i++) {
-                    resultObj.imgArr.push(allImg[i].src);
-                }
+        let allImg = document.querySelectorAll('img.img_large');
+        if(allImg && allImg.length > 0 ){
+            for (i = 0; i < allImg.length; i++) {
+                resultObj.imgArr.push(allImg[i].src);
             }
         }
 
-        pushImgLink();
-
         let textTable = document.querySelectorAll('div>table')[2];
-        resultObj.text = textTable.innerText;
-
-        let nextLi = document.querySelector('li.w');
-        if(nextLi && nextLi.innerText == "下一頁"){
-            nextLi.click();
-        }
+        resultObj.text = textTable ? textTable.innerText : '';
 
         return resultObj;
     });
 
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    const nextLi = await page.$("li.w");
+    const nextLiText = await page.evaluate(element => element.textContent, nextLi);
+    if(nextLiText && nextLiText == '下一頁') {
+        await page.$$eval('li.w', elements => elements[0].click());
+        await waitForMoment(5000);
+        const nextImgs = await page.evaluate(() => {
+            const imgs = document.querySelectorAll('img.img_large');
+            let srcs = imgs && imgs.length > 0 ? [].map.call(imgs, a => a.src) : [];
+            return srcs;
+        });
+
+        result.imgArr = result.imgArr.concat(nextImgs);
     }
 
-    await delay(5000);
+    await waitForMoment(5000);
 
     await page.close();
 
@@ -169,9 +173,7 @@ let startScrapeDetail = () => {
                                 console.log(imgPath, " was saved!");
                                 if(imgCount == r.imgArr.length) {
                                     if(typeof r.text == 'string' && r.text.length > 0)
-                                        writeText(r.text, _path, function() {
-                                            resolve();
-                                        });
+                                        writeText(r.text, _path, function() {resolve();});
                                 }
                             }));
                         }
