@@ -148,10 +148,10 @@ let downloadImg = function(uri, index, path, callback){
         request({
             url: uri,
             timeout: 120000
-        }).pipe(fs.createWriteStream(imgPath)).on('close', callback).on('error', function(e) {
+        }).pipe(fs.createWriteStream(imgPath)).on('error', function(e) {
             console.error("downloadImg error: ", e);
             callback();
-        });
+        }).on('close', callback);
     });
 }
 let writeText = function(text, path, callback) {
@@ -167,7 +167,6 @@ let startScrapeDetail = () => {
     let pdCount = 0;
     (async function loop() {
         for (const page in pdList) {
-            // for (let i = pdList[page].length - 1; i >= 0; i--) {
             for (let i = 0; i < pdList[page].length; i++) {
                 const _u = pdList[page][i]['u'];
                 const _path = pdList[page][i]['pdPath'];
