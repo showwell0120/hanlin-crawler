@@ -144,15 +144,18 @@ let scrapeContent = async (u) => {
 }
 let downloadImg = function(uri, index, path, callback){
     let imgPath = path + '/img_' + index + '.jpg';
-    request.head(uri, function(err, res, body){
-        request({
-            url: uri,
-            timeout: 120000
-        }).pipe(fs.createWriteStream(imgPath)).on('error', function(e) {
-            console.error("downloadImg error: ", e);
-            callback();
-        }).on('close', callback);
-    });
+    try {
+        request.head(uri, function(err, res, body){
+            request(uri).on('error', function(e) {
+                console.error("downloadImg error: ", e, imgPath);
+                callback();
+            }).pipe(fs.createWriteStream(imgPath)).on('close', callback);
+        });
+    } catch (error) {
+        console.error("downloadImg error: ", e, imgPath);
+        callback();
+    }
+    
 }
 let writeText = function(text, path, callback) {
     let textPath = path + '/text.txt';
